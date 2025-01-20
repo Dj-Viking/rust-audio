@@ -6,9 +6,12 @@ use std::{
 	path::Path,
 };
 
+use qdft::QDFT;
 use anyhow::{bail, Context};
 use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
+use num::complex::Complex;
+use num::complex::ComplexFloat;
 
 fn main() -> anyhow::Result<()> {
 	let (mut sock, protocol_version) =
@@ -35,6 +38,7 @@ fn main() -> anyhow::Result<()> {
 		)?;
 
 	println!("socket {:#?}", sock);
+
 
 	// make recording stream on the server
 	protocol::write_command_message(
@@ -64,9 +68,20 @@ fn main() -> anyhow::Result<()> {
 
 	println!("record strim reply {:#?}", record_stream);
 
+	let mut qdft = QDFT::<f32, f32>::new(
+    	source_info.sample_spec.sample_rate as f64,
+		(30.0, source_info.sample_spec.sample_rate as f64 / 2.0),
+		48.0,
+		0.0,
+		Some((0.5,-0.5))
+	);
+
 	// buffer for the audio samples
 	let mut buf = vec![0; record_stream.buffer_attr.fragment_size as usize];
 
+	println!("frag size {}",record_stream.buffer_attr.fragment_size);
+
+	let mut complex_vec = vec![Complex::<f32>::ZERO; qdft.size()];
 	// read messages from the server in a loop. 
 	// should pool socket here.....
 	loop {
@@ -79,33 +94,24 @@ fn main() -> anyhow::Result<()> {
 			)?;
 			println!("command from server {:#?}", msg);
 		} else {
+
 			println!("got {} bytes of data", desc.length);
 			buf.resize(desc.length as usize,0);
+
 			// read the data
 			sock.read_exact(&mut buf)?;
+			//break;
 
 			let mut cursor = std::io::Cursor::new(buf.as_slice());
 			while cursor.position() < cursor.get_ref().len() as u64 {
 				match record_stream.sample_spec.format {
 					protocol::SampleFormat::S32Le => {
-						println!("got some S32Le samps {:?}", 
-							cursor.read_i16::<byteorder::LittleEndian>()?
-						);
-					},
-					protocol::SampleFormat::Float32Le => {
-						println!("got some Float32Le samps {:?}", 
-							cursor.read_i16::<byteorder::LittleEndian>()?
-						);
-					},
-					protocol::SampleFormat::S16Le => {
-						println!("got some S16Le samps {:?}", 
-							cursor.read_i16::<byteorder::LittleEndian>()?
-						);
+						let sample = cursor.read_i32::<byteorder::LittleEndian>()?;
+						qdft.qdft_scalar(&(sample as f32), &mut complex_vec);
+						println!("huh {:#?}", complex_vec.iter().map(|x| ComplexFloat::abs(*x)).collect::<Vec<_>>());
 					},
 					_ => unreachable!(),
 				};
-
-				// break;
 			}
 		}
 
