@@ -1,13 +1,11 @@
 use std::{
 	ffi::CString,
-	fs::File,
-	io::{BufReader, BufWriter, Read},
+	io::{BufReader, Read},
 	os::unix::net::UnixStream,
-	path::Path,
 };
 
 use qdft::QDFT;
-use anyhow::{bail, Context};
+use anyhow::{Context};
 use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
 use num::complex::Complex;
@@ -71,7 +69,7 @@ fn main() -> anyhow::Result<()> {
 	let mut qdft = QDFT::<f32, f32>::new(
     	source_info.sample_spec.sample_rate as f64,
 		(30.0, source_info.sample_spec.sample_rate as f64 / 2.0),
-		48.0,
+		4.0,
 		0.0,
 		Some((0.5,-0.5))
 	);
@@ -107,12 +105,24 @@ fn main() -> anyhow::Result<()> {
 				match record_stream.sample_spec.format {
 					protocol::SampleFormat::S32Le => {
 						let sample = cursor.read_i32::<byteorder::LittleEndian>()?;
+						// println!("sample? {}", sample);
 						qdft.qdft_scalar(&(sample as f32), &mut complex_vec);
-						println!("huh {:#?}", complex_vec.iter().map(|x| ComplexFloat::abs(*x)).collect::<Vec<_>>());
+
+						println!("position {:?}", cursor.position());
+						println!("normalized dft complex numbers...i think {:#?}", complex_vec.iter()
+							.map(|x| ComplexFloat::abs(*x))
+							.collect::<Vec<_>>());
+
+						std::thread::sleep(std::time::Duration::from_millis(1));
+						std::process::Command::new("clear").status().unwrap();
+
+						// println!("huh {:#?}", complex_vec);
 					},
 					_ => unreachable!(),
 				};
 			}
+			
+
 		}
 
 		// break;
