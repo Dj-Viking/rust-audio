@@ -10,6 +10,9 @@ use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
 use num::complex::Complex;
 use num::complex::ComplexFloat;
+use spectrum_analyzer::windows::hann_window;
+use spectrum_analyzer::{FrequencyValue, samples_fft_to_spectrum, FrequencyLimit};
+use spectrum_analyzer::scaling::divide_by_N_sqrt;
 
 fn main() -> anyhow::Result<()> {
 	let (mut sock, protocol_version) =
@@ -98,6 +101,7 @@ fn main() -> anyhow::Result<()> {
 
 			// read the data
 			sock.read_exact(&mut buf)?;
+
 			//break;
 
 			let mut cursor = std::io::Cursor::new(buf.as_slice());
@@ -108,11 +112,37 @@ fn main() -> anyhow::Result<()> {
 						// println!("sample? {}", sample);
 						qdft.qdft_scalar(&(sample as f32), &mut complex_vec);
 
-						println!("position {:?}", cursor.position());
-						println!("normalized dft complex numbers...i think {:#?}", complex_vec.iter()
+						// println!("position {:?}", cursor.position());
+						let float_samps = complex_vec.iter()
 							.map(|x| ComplexFloat::abs(*x))
-							.collect::<Vec<_>>());
+							.collect::<Vec<_>>();
+						// println!("normalized dft complex numbers...i think {:#?}", complex_vec.iter()
+						// 	source.map(|x| ComplexFloat::abs(*x))
+						// 	.collect::<Vec<_>>());
 
+						let hann_window = hann_window(&float_samps[0..32]);
+
+						let spectrum_hann_window = samples_fft_to_spectrum(
+							&hann_window,
+							source_info.sample_spec.sample_rate,
+							FrequencyLimit::All,
+							Some(&divide_by_N_sqrt),
+						).unwrap();
+
+						for (fr, fr_val) in spectrum_hann_window.data().iter() {
+							let val_to_bar = |val| {
+								let num = format!("{}", val).parse::<f32>().unwrap();
+								let mut barstr = String::new();
+								for i in 0..num as usize {
+									if i % 10 == 0 {
+										barstr += ".";	
+									}
+								}	
+								barstr
+							};
+							println!("{}Hz => {:?}", fr, val_to_bar(fr_val));
+
+						}
 						std::thread::sleep(std::time::Duration::from_millis(1));
 						std::process::Command::new("clear").status().unwrap();
 
@@ -121,6 +151,8 @@ fn main() -> anyhow::Result<()> {
 					_ => unreachable!(),
 				};
 			}
+
+
 			
 
 		}
