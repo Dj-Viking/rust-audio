@@ -4,7 +4,6 @@ use std::{
 	os::unix::net::UnixStream,
 };
 
-use qdft::QDFT;
 use anyhow::{Context};
 use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
@@ -69,20 +68,13 @@ fn main() -> anyhow::Result<()> {
 
 	println!("record strim reply {:#?}", record_stream);
 
-	let mut qdft = QDFT::<f32, f32>::new(
-    	source_info.sample_spec.sample_rate as f64,
-		(30.0, source_info.sample_spec.sample_rate as f64 / 2.0),
-		4.0,
-		0.0,
-		Some((0.5,-0.5))
-	);
 
 	// buffer for the audio samples
 	let mut buf = vec![0; record_stream.buffer_attr.fragment_size as usize];
+	let mut float_buf = Vec::<f32>::new();
 
 	println!("frag size {}",record_stream.buffer_attr.fragment_size);
 
-	let mut complex_vec = vec![Complex::<f32>::ZERO; qdft.size()];
 	// read messages from the server in a loop. 
 	// should pool socket here.....
 	loop {
@@ -96,68 +88,42 @@ fn main() -> anyhow::Result<()> {
 			println!("command from server {:#?}", msg);
 		} else {
 
-			println!("got {} bytes of data", desc.length);
+			// println!("got {} bytes of data", desc.length);
 			buf.resize(desc.length as usize,0);
+
+			float_buf.clear();
 
 			// read the data
 			sock.read_exact(&mut buf)?;
-
-			//break;
 
 			let mut cursor = std::io::Cursor::new(buf.as_slice());
 			while cursor.position() < cursor.get_ref().len() as u64 {
 				match record_stream.sample_spec.format {
 					protocol::SampleFormat::S32Le => {
 						let sample = cursor.read_i32::<byteorder::LittleEndian>()?;
-						// println!("sample? {}", sample);
-						qdft.qdft_scalar(&(sample as f32), &mut complex_vec);
-
-						// println!("position {:?}", cursor.position());
-						let float_samps = complex_vec.iter()
-							.map(|x| ComplexFloat::abs(*x))
-							.collect::<Vec<_>>();
-						// println!("normalized dft complex numbers...i think {:#?}", complex_vec.iter()
-						// 	source.map(|x| ComplexFloat::abs(*x))
-						// 	.collect::<Vec<_>>());
-
-						let hann_window = hann_window(&float_samps[0..32]);
-
-						let spectrum_hann_window = samples_fft_to_spectrum(
-							&hann_window,
-							source_info.sample_spec.sample_rate,
-							FrequencyLimit::All,
-							Some(&divide_by_N_sqrt),
-						).unwrap();
-
-						for (fr, fr_val) in spectrum_hann_window.data().iter() {
-							let val_to_bar = |val| {
-								let num = format!("{}", val).parse::<f32>().unwrap();
-								let mut barstr = String::new();
-								for i in 0..num as usize {
-									if i % 10 == 0 {
-										barstr += ".";	
-									}
-								}	
-								barstr
-							};
-							println!("{}Hz => {:?}", fr, val_to_bar(fr_val));
-
-						}
-						std::thread::sleep(std::time::Duration::from_millis(1));
-						std::process::Command::new("clear").status().unwrap();
-
-						// println!("huh {:#?}", complex_vec);
-					},
+						float_buf.push(sample as f32);
+					}
 					_ => unreachable!(),
-				};
+				}
 			}
 
+			if float_buf.len() < 256 { continue; }
+			let hann_window = hann_window(&float_buf[0..256]);
 
-			
+			let spectrum_hann_window = samples_fft_to_spectrum(
+				&hann_window,
+				source_info.sample_spec.sample_rate,
+				FrequencyLimit::Range(50.0, 12000.0),
+				Some(&divide_by_N_sqrt),
+			).unwrap();
 
+			// clear
+			print!("\x1B[2J\x1B[1;1H");
+			for (fr, fr_val) in spectrum_hann_window.data().iter() {
+				println!("{:<10}Hz => {}", fr.to_string(), ".".repeat((fr_val.val() / 1000000.0) as usize));
+
+			}
 		}
-
-		// break;
 	}
 
 	Ok(())
