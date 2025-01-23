@@ -7,10 +7,8 @@ use std::{
 use anyhow::{Context};
 use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
-use num::complex::Complex;
-use num::complex::ComplexFloat;
 use spectrum_analyzer::windows::hann_window;
-use spectrum_analyzer::{FrequencyValue, samples_fft_to_spectrum, FrequencyLimit};
+use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 use spectrum_analyzer::scaling::divide_by_N_sqrt;
 
 fn main() -> anyhow::Result<()> {
@@ -119,8 +117,13 @@ fn main() -> anyhow::Result<()> {
 
 			// clear
 			print!("\x1B[2J\x1B[1;1H");
+			// print dots for the magnitude of the frequency at that frequency value
 			for (fr, fr_val) in spectrum_hann_window.data().iter() {
-				println!("{:<10}Hz => {}", fr.to_string(), ".".repeat((fr_val.val() / 1000000.0) as usize));
+				if fr.val() < 200.0 {
+					println!("{:<10}Hz => {}", fr.to_string(), ".".repeat((fr_val.val() / 10000000.0) as usize));
+				} else {
+					println!("{:<10}Hz => {}", fr.to_string(), ".".repeat((fr_val.val() / 1000000.0) as usize));
+				}
 
 			}
 		}
