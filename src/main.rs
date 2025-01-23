@@ -124,7 +124,6 @@ fn main() -> anyhow::Result<()> {
 				} else {
 					println!("{:<10}Hz => {}", fr.to_string(), ".".repeat((fr_val.val() / 1000000.0) as usize));
 				}
-
 			}
 		}
 	}
