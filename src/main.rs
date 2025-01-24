@@ -74,7 +74,7 @@ fn main() -> anyhow::Result<()> {
 	println!("frag size {}",record_stream.buffer_attr.fragment_size);
 
 	// read messages from the server in a loop. 
-	// should pool socket here.....
+	// should poll(?) socket here.....
 	loop {
 		let desc = protocol::read_descriptor(&mut sock)?;
 
