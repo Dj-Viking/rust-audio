@@ -73,6 +73,9 @@ fn main() -> anyhow::Result<()> {
 
 	println!("frag size {}",record_stream.buffer_attr.fragment_size);
 
+	// nice
+	let mut fft_buf = [0.0; 69];
+
 	// read messages from the server in a loop. 
 	// should poll(?) socket here.....
 	loop {
@@ -108,22 +111,31 @@ fn main() -> anyhow::Result<()> {
 			if float_buf.len() < 256 { continue; }
 			let hann_window = hann_window(&float_buf[0..256]);
 
-			let spectrum_hann_window = samples_fft_to_spectrum(
+			let fft = samples_fft_to_spectrum(
 				&hann_window,
 				source_info.sample_spec.sample_rate,
 				FrequencyLimit::Range(50.0, 12000.0),
 				Some(&divide_by_N_sqrt),
 			).unwrap();
 
+			let fr_mags: Vec<(f32, f32)> = fft.data().iter().map(|(fr, mag)| (fr.val(), mag.val())).collect();
+
+			const FACTOR: f32 = 0.98;
+
+			fr_mags.iter().map(|(_, x)| x)
+				.zip(fft_buf.iter_mut()).for_each(|(c, p)| 
+					if *c > *p { *p = *c; } 
+					else { *p *= FACTOR; });
+
 			// clear
 			print!("\x1B[2J\x1B[1;1H");
 			// print dots for the magnitude of the frequency at that frequency value
-			for (fr, fr_val) in spectrum_hann_window.data().iter() {
-				if fr.val() < 500.0 {
-					println!("{:<10}Hz => {}", fr.to_string(), "|".repeat((fr_val.val() / 10000000.0) as usize));
-				} else {
-					println!("{:<10}Hz => {}", fr.to_string(), "|".repeat((fr_val.val() / (1000000.0) ) as usize));
+			for (f, m) in fr_mags.iter().map(|(f, _)| f).zip(fft_buf.iter()) {
+				if *f < 500.0 {
+					println!("{f:.2}Hz => {}", "|".repeat((m / 10000000.0) as usize));
+					continue;
 				}
+				println!("{f:.2}Hz => {}", "|".repeat((m / 1000000.0) as usize));
 			}
 		}
 	}
