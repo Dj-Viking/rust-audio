@@ -120,9 +120,9 @@ fn main() -> anyhow::Result<()> {
 			// print dots for the magnitude of the frequency at that frequency value
 			for (fr, fr_val) in spectrum_hann_window.data().iter() {
 				if fr.val() < 500.0 {
-					println!("{:<10}Hz => {}", fr.to_string(), ".".repeat((fr_val.val() / 10000000.0) as usize));
+					println!("{:<10}Hz => {}", fr.to_string(), "|".repeat((fr_val.val() / 10000000.0) as usize));
 				} else {
-					println!("{:<10}Hz => {}", fr.to_string(), ".".repeat((fr_val.val() / (1000000.0) ) as usize));
+					println!("{:<10}Hz => {}", fr.to_string(), "|".repeat((fr_val.val() / (1000000.0) ) as usize));
 				}
 			}
 		}
