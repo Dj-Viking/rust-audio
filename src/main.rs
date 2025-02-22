@@ -135,6 +135,8 @@ fn main() -> anyhow::Result<()> {
 					if *c > *p { *p = *c; } 
 					else { *p *= FACTOR; });
 
+			// sometimes after a while I think something gets bugged out and 
+			// the audio server takes a shit and lags pretty badly not sure why
 			// clear
 			print!("\x1B[2J\x1B[1;1H");
 			// print dots for the magnitude of the frequency at that frequency value
