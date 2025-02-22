@@ -118,9 +118,17 @@ fn main() -> anyhow::Result<()> {
 				Some(&divide_by_N_sqrt),
 			).unwrap();
 
+
 			let fr_mags: Vec<(f32, f32)> = fft.data().iter().map(|(fr, mag)| (fr.val(), mag.val())).collect();
 
-			const FACTOR: f32 = 0.98;
+			// Apply smoothing
+			let fr_mags = exponential_moving_average(&fr_mags, 0.2);
+
+			const FACTOR: f32 = 0.99;
+			
+			// TODO: keep the example of the 'smoothing' that i figured out....might be useful
+			// for the visualization so that I can look at a wider range of frequencies to use
+			// for changing the visuals
 
 			fr_mags.iter().map(|(_, x)| x)
 				.zip(fft_buf.iter_mut()).for_each(|(c, p)| 
@@ -131,16 +139,27 @@ fn main() -> anyhow::Result<()> {
 			print!("\x1B[2J\x1B[1;1H");
 			// print dots for the magnitude of the frequency at that frequency value
 			for (f, m) in fr_mags.iter().map(|(f, _)| f).zip(fft_buf.iter()) {
-				if *f < 500.0 {
-					println!("{f:.2}Hz => {}", "|".repeat((m / 10000000.0) as usize));
+				if *f < 1000.0 {
+					println!("{f:.2}Hz => {}", "|".repeat((m / 100000.0) as usize));
 					continue;
 				}
-				println!("{f:.2}Hz => {}", "|".repeat((m / 1000000.0) as usize));
+				println!("{f:.2}Hz => {}", "|".repeat((m / 100000.0) as usize));
 			}
 		}
 	}
 
 	Ok(())
+}
+
+fn exponential_moving_average(data: &[(f32, f32)], alpha: f32) -> Vec<(f32, f32)> {
+    let mut smoothed = Vec::with_capacity(data.len());
+    let mut prev = data[0];
+    for &(fr, val) in data {
+        let smoothed_val = alpha * val + (1.0 - alpha) * prev.1;
+        smoothed.push((fr, smoothed_val));
+        prev = (fr, smoothed_val);
+    }
+    smoothed
 }
 
 // establish an audio client for the pulseaudio server
