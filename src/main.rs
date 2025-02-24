@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context};
 use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
+use pulseaudio::protocol::stream::BufferAttr;
 use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 use spectrum_analyzer::scaling::divide_by_N_sqrt;
@@ -78,9 +79,10 @@ fn main() -> anyhow::Result<()> {
 
 	// read messages from the server in a loop. 
 	// should poll(?) socket here.....
+	let mut i = 0;
 	loop {
+		i += 1;	
 		let desc = protocol::read_descriptor(&mut sock)?;
-
 		if desc.channel == u32::MAX {
 			let (_, msg) = protocol::Command::read_tag_prefixed(
 				&mut sock,
@@ -88,13 +90,18 @@ fn main() -> anyhow::Result<()> {
 			)?;
 			println!("command from server {:#?}", msg);
 		} else {
+			// dunno why it's sending 0 bytes but sometimes does
+			// if desc.length == 0 { continue; }
 
-			// println!("got {} bytes of data", desc.length);
+			// println!("{} | got {} bytes of data", i, desc.length);
 			buf.resize(desc.length as usize,0);
 
 			float_buf.clear();
 
 			// read the data
+			// Note:!!! if pavucontrol isn't running
+			// then this socket read will be really slow
+			// almost 2 seconds of latency between reads
 			sock.read_exact(&mut buf)?;
 
 			let mut cursor = std::io::Cursor::new(buf.as_slice());
@@ -117,14 +124,14 @@ fn main() -> anyhow::Result<()> {
 				FrequencyLimit::Range(50.0, 12000.0),
 				Some(&divide_by_N_sqrt),
 			).unwrap();
-
-
+			
 			let fr_mags: Vec<(f32, f32)> = fft.data().iter().map(|(fr, mag)| (fr.val(), mag.val())).collect();
 
-			// Apply smoothing
-			let fr_mags = exponential_moving_average(&fr_mags, 0.2);
+			// // Apply smoothing
+			
+			// let fr_mags = exponential_moving_average(&fr_mags, 0.2);
 
-			const FACTOR: f32 = 0.99;
+			const FACTOR: f32 = 0.98;
 			
 			// TODO: keep the example of the 'smoothing' that i figured out....might be useful
 			// for the visualization so that I can look at a wider range of frequencies to use
@@ -138,14 +145,14 @@ fn main() -> anyhow::Result<()> {
 			// sometimes after a while I think something gets bugged out and 
 			// the audio server takes a shit and lags pretty badly not sure why
 			// clear
+			
 			print!("\x1B[2J\x1B[1;1H");
-			// print dots for the magnitude of the frequency at that frequency value
+
+			// print bars for the magnitude of the frequency at that frequency value
+			
 			for (f, m) in fr_mags.iter().map(|(f, _)| f).zip(fft_buf.iter()) {
-				if *f < 1000.0 {
-					println!("{f:.2}Hz => {}", "|".repeat((m / 100000.0) as usize));
-					continue;
-				}
-				println!("{f:.2}Hz => {}", "|".repeat((m / 100000.0) as usize));
+				// println!("mag of {f} {}", m / 100000.0);
+				println!("{f:.2}Hz => {}", "|".repeat((m / 1000000.0) as usize));
 			}
 		}
 	}
