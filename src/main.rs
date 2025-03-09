@@ -151,8 +151,8 @@ fn main() -> anyhow::Result<()> {
 			// print bars for the magnitude of the frequency at that frequency value
 			
 			for (f, m) in fr_mags.iter().map(|(f, _)| f).zip(fft_buf.iter()) {
-				// println!("mag of {f} {}", m / 100000.0);
-				println!("{f:.2}Hz => {}", "|".repeat((m / 1000000.0) as usize));
+				 //println!("mag of {f} {}", m / 100000.0);
+				println!("{f:.2}Hz => {}", "|".repeat(((m * f).sqrt() / 10000.0) as usize));
 			}
 		}
 	}
