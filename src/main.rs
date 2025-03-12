@@ -102,9 +102,14 @@ fn main() -> anyhow::Result<()> {
 			// Note:!!! if pavucontrol isn't running
 			// then this socket read will be really slow
 			// almost 2 seconds of latency between reads
-			sock.read_exact(&mut buf)?;
+			//
+			// read the length of the buffer...
+			// TODO: handle reading only the amount I need to per 'frame'
+			// instead of just reading and exhausting the buffer before it gets filled up again
+			// don't know how fast this loop as at the moment but maybe 60 fps? worth checking
+			let n = sock.read(&mut buf)?;
 
-			let mut cursor = std::io::Cursor::new(buf.as_slice());
+			let mut cursor = std::io::Cursor::new(&buf[..n]);
 			while cursor.position() < cursor.get_ref().len() as u64 {
 				match record_stream.sample_spec.format {
 					protocol::SampleFormat::S32Le => {
