@@ -7,16 +7,15 @@ use std::{
 };
 
 use std::io::Write;
-use anyhow::{Context};
 use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
 use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 use spectrum_analyzer::scaling::divide_by_N_sqrt;
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let (mut sock, protocol_version) =
-		connect_and_init().context("failed to init client")?;
+		connect_and_init()?;
 
 	// i found this name by running `pacmd list-sources` and just finding the
 	// name of the thing I want to get audio samples from
@@ -186,9 +185,9 @@ fn exponential_moving_average(data: &[(f32, f32)], alpha: f32) -> Vec<(f32, f32)
 }
 
 // establish an audio client for the pulseaudio server
-fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
+fn connect_and_init() -> Result<(BufReader<UnixStream>, u16), Box<dyn std::error::Error>> {
 
-    let socket_path = pulseaudio::socket_path_from_env().context("PulseAudio not available")?;
+    let socket_path = pulseaudio::socket_path_from_env().unwrap();
     let mut sock = std::io::BufReader::new(UnixStream::connect(socket_path)?);
 
     let cookie = pulseaudio::cookie_path_from_env()
