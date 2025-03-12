@@ -148,12 +148,22 @@ fn main() -> anyhow::Result<()> {
 			
 			print!("\x1B[2J\x1B[1;1H");
 
+			use std::io::Write;
+			let mut stdout = std::io::stdout();
+			let mut handle = stdout.lock();
 			// print bars for the magnitude of the frequency at that frequency value
 			
 			for (f, m) in fr_mags.iter().map(|(f, _)| f).zip(fft_buf.iter()) {
-				 //println!("mag of {f} {}", m / 100000.0);
-				println!("{f:.2}Hz => {}", "|".repeat(((m * f).sqrt() / 10000.0) as usize));
+				let mut val = (m * f).sqrt() / 3000.0;
+
+				// poor man's noise suppression
+				val -= 30.0;
+				if val < 30.0 { val = 0.0; } else { val = val.floor(); }
+
+				writeln!(handle, "{val} - {f:.2}Hz => {}", "|".repeat(val as usize));
 			}
+
+			stdout.flush();
 		}
 	}
 
@@ -214,3 +224,29 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
         protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock, protocol_version)?;
     Ok((sock, protocol_version))
 }
+/* 
+*sample_rate = 44100
+channels = 2
+bytes_per_sample = 4 //sl32le
+bytes_per_second = sample_rate * channels * bytes_per_sample
+
+start_time = get_monotonic_time();
+frame_time = 1.0 / sample_rate
+
+loop:
+  current_time = get_monotonic_time()
+  elapsed_time = current_time - start_time
+
+  expected_bytes = elapsed_time * bytes_per_second
+  available_bytes = read_from_stream()
+
+  if available_bytes < expected_bytes :
+    sleep(frame_time)
+    continue
+
+  process_audio()
+
+  drift = get_monotonic_time() - (start_time + elapsed_time)
+  if drift > ALLOWED_DRIFT:
+    adjust_reading_rate() // to compensate for bad hardware
+* */
