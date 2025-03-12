@@ -1,13 +1,15 @@
+#![allow(dead_code)]
+#![allow(unreachable_code)]
 use std::{
 	ffi::CString,
 	io::{BufReader, Read},
 	os::unix::net::UnixStream,
 };
 
+use std::io::Write;
 use anyhow::{Context};
 use byteorder::ReadBytesExt;
 use pulseaudio::protocol;
-use pulseaudio::protocol::stream::BufferAttr;
 use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 use spectrum_analyzer::scaling::divide_by_N_sqrt;
@@ -25,7 +27,7 @@ fn main() -> anyhow::Result<()> {
 		sock.get_mut(),
 		10,
 		protocol::Command::GetSourceInfo(protocol::GetSourceInfo {
-			name: Some(CString::new(&*device_name)?),
+			name: Some(CString::new(device_name)?),
 			..Default::default()
 		}),
 		protocol_version,
@@ -79,9 +81,7 @@ fn main() -> anyhow::Result<()> {
 
 	// read messages from the server in a loop. 
 	// should poll(?) socket here.....
-	let mut i = 0;
 	loop {
-		i += 1;	
 		let desc = protocol::read_descriptor(&mut sock)?;
 		if desc.channel == u32::MAX {
 			let (_, msg) = protocol::Command::read_tag_prefixed(
@@ -148,7 +148,6 @@ fn main() -> anyhow::Result<()> {
 			
 			print!("\x1B[2J\x1B[1;1H");
 
-			use std::io::Write;
 			let mut stdout = std::io::stdout();
 			let mut handle = stdout.lock();
 			// print bars for the magnitude of the frequency at that frequency value
@@ -160,10 +159,10 @@ fn main() -> anyhow::Result<()> {
 				val -= 30.0;
 				if val < 30.0 { val = 0.0; } else { val = val.floor(); }
 
-				writeln!(handle, "{val} - {f:.2}Hz => {}", "|".repeat(val as usize));
+				let _ = writeln!(handle, "{val} - {f:.2}Hz => {}", "|".repeat(val as usize));
 			}
 
-			stdout.flush();
+			let _ = stdout.flush();
 		}
 	}
 
