@@ -135,7 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			
 			// let fr_mags = exponential_moving_average(&fr_mags, 0.2);
 
-			const FACTOR: f32 = 0.98;
+			const FACTOR: f32 = 0.99;
 			
 			// TODO: keep the example of the 'smoothing' that i figured out....might be useful
 			// for the visualization so that I can look at a wider range of frequencies to use
@@ -159,9 +159,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			for (f, m) in fr_mags.iter().map(|(f, _)| f).zip(fft_buf.iter()) {
 				let mut val = (m * f).sqrt() / 3000.0;
 
-				// poor man's noise suppression
-				val -= 30.0;
-				if val < 30.0 { val = 0.0; } else { val = val.floor(); }
+				// // poor man's noise suppression
+				// val -= 30.0;
+				// if val < 30.0 { val = 0.0; } else { val = val.floor(); }
 
 				let _ = writeln!(handle, "{val} - {f:.2}Hz => {}", "|".repeat(val as usize));
 			}
